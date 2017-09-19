@@ -2,7 +2,11 @@ import serial
 import struct
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 # import time
+
+filePath = "/home/rsharman/Documents/POE/3Dscanner"
+serialPort = "/dev/ttyUSB0"
 
 
 def getData():
@@ -39,6 +43,26 @@ def getData():
         return data
 
 
+def writeToFile(data):
+    files = os.listdir(filePath)
+    lastFile = 0
+    for item in files:
+        if item[:8] == 'ScanData':
+            item[10:]
+            if item[10:] == '.txt':
+                fileNumber = int(item[8:10])
+                if fileNumber > lastFile:
+                    lastFile = fileNumber
+    num = str(lastFile + 1)
+    if lastFile < 9:
+        num = '0' + num
+    fileName = 'ScanData' + num + '.txt'
+    dataFile = open(filePath+'/'+fileName, 'w')
+    for line in data:
+        dataFile.write(str(line) + '\n')
+    return num
+
+
 def convertToNPArray(dataArray):
 
     x = []
@@ -73,7 +97,7 @@ def draw_heatmap(x, y, map_value):
     z_max = plt_z.max()
     plt_z = np.transpose(plt_z)
 
-    plot_name = "demo"
+    plot_name = "Depth Scan"
 
     color_map = plt.cm.gist_heat  # plt.cm.rainbow #plt.cm.hot #plt.cm.gist_heat
     plt.clf()
@@ -89,8 +113,18 @@ def draw_heatmap(x, y, map_value):
 
 
 if __name__ == "__main__":
-    port = serial.Serial("/dev/ttyUSB0")
+    port = serial.Serial(serialPort)
     print("Connected to " + port.name)
-    rawData = getData()
-    x, y, map_value = convertToNPArray(rawData)
-    draw_heatmap(x, y, map_value)
+    #rawData = getData()
+    #x, y, map_value = convertToNPArray(rawData)
+    #plot = draw_heatmap(x, y, map_value)
+    running = True
+    while running:
+        rawData = getData()
+        fileNum = writeToFile(rawData)
+        x, y, map_value = convertToNPArray(rawData)
+        plot = draw_heatmap(x, y, map_value)
+        plot.savefig(filePath + '/' + 'Scan' + fileNum + '.png')
+        response = input('Scan again? y/n: ')
+        if(response.lower() != 'y'):
+            running = False
