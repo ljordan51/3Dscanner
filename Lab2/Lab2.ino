@@ -3,7 +3,7 @@
 const byte panPin = 8;
 const byte tiltPin = 9;
 const byte sensorPin = 3;
-const byte step = 3;
+const byte step = 1;
 const byte panMin = 42;
 const byte panMax = 132;
 const byte tiltMin = 30;
