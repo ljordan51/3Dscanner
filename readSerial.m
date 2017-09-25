@@ -1,24 +1,21 @@
-s = serial('COM7', 'BaudRate', 9600);
-s.InputBufferSize = 60;
-disp(s);
-% A = zeros(6,1);
-% temp = zeros(6,1)-1;
+function res = readSerial()    
+    s = serial('COM7', 'BaudRate', 9600);
+    disp(s);
 
-fopen(s);
-fwrite(s,1);
-pause(20);
-% while 1
-%     if s.BytesAvailable == 6
-%         temp = fread(s);
-%     end
-%     if temp(1) == 255
-%         break
-%     elseif temp(1) == -1
-%         continue
-%     else
-%         A = [A;temp];
-%     end
-% end
-disp(s);
-fclose(s);
-disp('done');
+    finishup = onCleanup(@() cleanup(ser));           % removes remaining data from the serial reader                                                                                            
+        function cleanup(s)
+            fclose(s);                                % close the serial reader
+            delete(s);                                % delete all information stored in the serial
+            clear s                                   % remove data from MATLAB
+            disp('Clean!')                            % tells you it cleaned: if it doesn't unplug and replug arduino
+        end
+
+    fopen(s);
+    pause(5);
+    fwrite(s,1);
+    pause(20);
+    res = fread(s);
+    disp(s);
+    fclose(s);
+    disp('done');
+end
