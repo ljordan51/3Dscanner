@@ -1,32 +1,35 @@
-import serial
-import struct
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-# import time
+import serial  # for communication with Arduino
+import struct  # for interpreting the bytes sent byt Arduino
+import matplotlib.pyplot as plt  # for plotting the data in a heatmap
+import numpy as np  # also for plotting the data
+import os  # for reading the filesystem to save files
+import sys  # for early terminations
+import math
 
 filePath = "/home/rsharman/Documents/POE/3Dscanner"
-serialPort = "/dev/ttyUSB0"
+# this is the directory where data and plot files will be saved
+serialPort = "/dev/ttyUSB0"  # the serial port the Arduino connects to
 
 
 def getData():
+    # read and interpret all the data from the Arduino (includes one full scan)
     data = []
     print('Waiting for Arduino...')
-    while not port.in_waiting:
+    while not port.in_waiting:  # wait for the Arduino to connect
         pass
     characters = []
-    while port.in_waiting:
+    while port.in_waiting:  # if there's stuff in the serial port, read it
         characters.append(str(port.read(1), 'utf-8'))
     line = ''
     line = line.join(characters).strip()
-    print(line)
+    print(line)  # Arduino sends "Arduino ready!" when it is ready
 
     if line == 'Arduino ready!':
-        response = input('Continue? y/n: ')
+        response = input('Continue? y/n: ')  #
         if(response.lower() == 'y'):
             pass
         else:
-            return
+            sys.exit()
         print('Starting scan')
         port.write(1)
         running = True
@@ -61,6 +64,22 @@ def writeToFile(data):
     for line in data:
         dataFile.write(str(line) + '\n')
     return num
+
+
+def convertToDist(data):
+    scaledData = []
+    for line in data:
+        inp = line[2]
+        dist = 8.1158 * 10**-9 * inp**4 + -1.3606 * 10**-5 * inp**3 + .0084 * inp**2 + -2.3375 * inp + 292.3818
+        # pan = (line[0] - 45)*math.pi/180
+        # tilt = (line[1] - 45)*math.pi/180
+        # x = dist * math.sin(pan)
+        # y = dist * math.sin(tilt)
+        # depth = abs(dist * math.sin(pan) * math.sin(tilt))
+        # newLine = [x, y, depth]
+        newLine = [line[0], line[1], dist]
+        scaledData.append(newLine)
+    return scaledData
 
 
 def convertToNPArray(dataArray):
@@ -104,7 +123,9 @@ def draw_heatmap(x, y, map_value):
     plt.pcolor(plt_x, plt_y, plt_z, cmap=color_map, vmin=z_min, vmax=z_max)
     plt.axis([plt_x.min(), plt_x.max(), plt_y.min(), plt_y.max()])
     plt.title(plot_name)
-    plt.colorbar().set_label(plot_name, rotation=270)
+    plt.xlabel('Pan angle (deg)')
+    plt.ylabel('Tilt angle (deg)')
+    plt.colorbar().set_label('Distance from scanner (cm)', rotation=270)
     ax = plt.gca()
     ax.set_aspect('equal')
     figure = plt.gcf()
@@ -115,16 +136,28 @@ def draw_heatmap(x, y, map_value):
 if __name__ == "__main__":
     port = serial.Serial(serialPort)
     print("Connected to " + port.name)
-    #rawData = getData()
-    #x, y, map_value = convertToNPArray(rawData)
-    #plot = draw_heatmap(x, y, map_value)
     running = True
     while running:
-        rawData = getData()
-        fileNum = writeToFile(rawData)
-        x, y, map_value = convertToNPArray(rawData)
-        plot = draw_heatmap(x, y, map_value)
-        plot.savefig(filePath + '/' + 'Scan' + fileNum + '.png')
-        response = input('Scan again? y/n: ')
-        if(response.lower() != 'y'):
+        selection = input('Scan, Load from file, or Quit? (s/l/q): ').lower()
+        if selection == 's':
+            rawData = getData()
+            fileNum = writeToFile(rawData)
+            scaledData = convertToDist(rawData)
+            x, y, map_value = convertToNPArray(scaledData)
+            plot = draw_heatmap(x, y, map_value)
+            plot.savefig(filePath + '/' + 'Scan' + fileNum + '.png')
+        elif selection == 'l':
+            dataPath = input('Enter the path of the desired data file: ')
+            dataFile = open(dataPath)
+            textData = dataFile.readlines()
+            rawData = []
+            for element in textData:
+                line = eval(element)
+                rawData.append(line)
+            scaledData = convertToDist(rawData)
+            for line in scaledData:
+                print(line)
+            x, y, map_value = convertToNPArray(scaledData)
+            plot = draw_heatmap(x, y, map_value)
+        else:
             running = False

@@ -3,7 +3,7 @@
 const byte panPin = 8;
 const byte tiltPin = 9;
 const byte sensorPin = 3;
-const byte step = 1;
+const byte step = 90/30;
 const byte panMin = 42;
 const byte panMax = 132;
 const byte tiltMin = 30;
@@ -19,7 +19,7 @@ void setup() {
   tilt.attach(tiltPin, 550, 2280);
   pan.write((panMin+panMax)/2);
   tilt.write((tiltMin+tiltMax)/2);
-  delay(1000);
+  delay(500);
 }
 
 void loop() {
@@ -63,8 +63,10 @@ void loop() {
 void measureSend(byte x, byte y){
   int dist = analogRead(sensorPin);
   byte data[6];
-  data[0] = map(x, panMin, panMax, panMax, panMin);
-  data[1] = y;
+  int panRange = panMax - panMin;
+  int tiltRange = tiltMax - tiltMin;
+  data[0] = map(x, panMin, panMax, 0, panRange);
+  data[1] = map(y, tiltMin, tiltMax, 0, tiltRange);
   data[2] = dist & 255;
   data[3] = (dist >> 8)  & 255;
   data[4] = (dist >> 16) & 255;
