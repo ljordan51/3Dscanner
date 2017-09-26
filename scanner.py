@@ -73,14 +73,13 @@ def convertToDist(data):  # scale the distance based on calibration tests
     for line in data:
         inp = line[2]
         dist = 8.1158 * 10**-9 * inp**4 + -1.3606 * 10**-5 * inp**3 + .0084 * inp**2 + -2.3375 * inp + 292.3818
-        pan = (line[0] - 45)*(math.pi/180)
-        tilt = (line[1] - 45)*(math.pi/180)
+        # attempts at converting to cartesian coordinates:
+        pan = (line[0])*(math.pi/180)
+        tilt = (line[1])*(math.pi/180)
         # x = dist * math.sin(pan) * math.cos(tilt)
         # y = dist * math.sin(tilt) * math.cos(pan)
         depth = dist * math.cos(pan) * math.cos(tilt)
         newLine = [line[0], line[1], depth]
-        # newLine = [line[0], line[1], depth]
-        # newLine = [pan, tilt, dist]
         scaledData.append(newLine)
     return scaledData
 
