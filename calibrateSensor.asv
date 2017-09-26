@@ -21,9 +21,7 @@ legend2 = strcat("Best Fit Curve - Order ", int2str(order));
 legend('Experimental Data', legend2);
 xlabel('Sensor Value');
 ylabel('Distance (cm)');
-title(strcat("Polyfit and Experimental Data Comparison - Order ", int2str(order)));
-grid on;
-axis([0,600,0,130]);
+title('
 
 figure
 plot(distances,sensorVals/1023*5);
