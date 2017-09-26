@@ -25,20 +25,23 @@ def getData():
     print(line)  # Arduino sends "Arduino ready!" when it is ready
 
     if line == 'Arduino ready!':
-        response = input('Continue? y/n: ')  #
+        response = input('Continue? y/n: ')  # wait for user to start scan
         if(response.lower() == 'y'):
             pass
         else:
-            sys.exit()
+            sys.exit()  # quit the program
         print('Starting scan')
-        port.write(1)
+        port.write(1)  # sending anyhthing to the serial port starts the Arduino
         running = True
-        while running:
-            line = port.read(6)
+        while running:  # save data from Arduino until Arduino says it's finished
+            line = port.read(6)  # each data point contains 6 bytes
             line = struct.unpack('<cci', line)
-            point = [ord(line[0]), ord(line[1]), line[2]]
+            # the first two bytes are chars (pan and tilt data)
+            # the last four bytes are the distance information
+            point = [ord(line[0]), ord(line[1]), line[2]]  # convert to numbers
             print(point)
             if point[2] < 0:
+                # the Arduino sends (255, 255, -1) after the last point
                 running = False
             else:
                 data.append(point)
@@ -46,43 +49,43 @@ def getData():
         return data
 
 
-def writeToFile(data):
-    files = os.listdir(filePath)
+def writeToFile(data):  # save the raw data to a .txt
+    files = os.listdir(filePath)  # make a list of all the files that already exist
     lastFile = 0
-    for item in files:
-        if item[:8] == 'ScanData':
-            item[10:]
-            if item[10:] == '.txt':
-                fileNumber = int(item[8:10])
-                if fileNumber > lastFile:
-                    lastFile = fileNumber
+    for item in files:  # figure out the number of the last file
+        if item[:8] == 'ScanData' and item[10:] == '.txt':
+            fileNumber = int(item[8:10])
+            if fileNumber > lastFile:
+                lastFile = fileNumber
     num = str(lastFile + 1)
     if lastFile < 9:
         num = '0' + num
-    fileName = 'ScanData' + num + '.txt'
+    fileName = 'ScanData' + num + '.txt'  # name the next file with the next number
     dataFile = open(filePath+'/'+fileName, 'w')
     for line in data:
-        dataFile.write(str(line) + '\n')
+        dataFile.write(str(line) + '\n')  # write the list to the file
+    dataFile.close()
     return num
 
 
-def convertToDist(data):
+def convertToDist(data):  # scale the distance based on calibration tests
     scaledData = []
     for line in data:
         inp = line[2]
         dist = 8.1158 * 10**-9 * inp**4 + -1.3606 * 10**-5 * inp**3 + .0084 * inp**2 + -2.3375 * inp + 292.3818
-        # pan = (line[0] - 45)*math.pi/180
-        # tilt = (line[1] - 45)*math.pi/180
-        # x = dist * math.sin(pan)
-        # y = dist * math.sin(tilt)
-        # depth = abs(dist * math.sin(pan) * math.sin(tilt))
-        # newLine = [x, y, depth]
-        newLine = [line[0], line[1], dist]
+        pan = (line[0] - 45)*(math.pi/180)
+        tilt = (line[1] - 45)*(math.pi/180)
+        # x = dist * math.sin(pan) * math.cos(tilt)
+        # y = dist * math.sin(tilt) * math.cos(pan)
+        depth = dist * math.cos(pan) * math.cos(tilt)
+        newLine = [line[0], line[1], depth]
+        # newLine = [line[0], line[1], depth]
+        # newLine = [pan, tilt, dist]
         scaledData.append(newLine)
     return scaledData
 
 
-def convertToNPArray(dataArray):
+def convertToNPArray(dataArray):  # convert the data to a numpy array for plotting
 
     x = []
     y = []
@@ -101,7 +104,7 @@ def convertToNPArray(dataArray):
     return x, y, map_value
 
 
-def draw_heatmap(x, y, map_value):
+def draw_heatmap(x, y, map_value):  # make the heatmap graphic with matplotlib
 
     plt_x = np.asarray(list(set(x)))
     plt_y = np.asarray(list(set(y)))
@@ -118,14 +121,15 @@ def draw_heatmap(x, y, map_value):
 
     plot_name = "Depth Scan"
 
-    color_map = plt.cm.gist_heat  # plt.cm.rainbow #plt.cm.hot #plt.cm.gist_heat
+    color_map = plt.cm.gist_heat_r
+    # other colormap options: plt.cm.rainbow plt.cm.hot plt.cm.gist_heat
     plt.clf()
     plt.pcolor(plt_x, plt_y, plt_z, cmap=color_map, vmin=z_min, vmax=z_max)
-    plt.axis([plt_x.min(), plt_x.max(), plt_y.min(), plt_y.max()])
+    # plt.axis([plt_x.max(), plt_x.min(), plt_y.min(), plt_y.max()])
     plt.title(plot_name)
     plt.xlabel('Pan angle (deg)')
     plt.ylabel('Tilt angle (deg)')
-    plt.colorbar().set_label('Distance from scanner (cm)', rotation=270)
+    plt.colorbar().set_label('Distance from scanner (cm)')
     ax = plt.gca()
     ax.set_aspect('equal')
     figure = plt.gcf()
@@ -134,29 +138,30 @@ def draw_heatmap(x, y, map_value):
 
 
 if __name__ == "__main__":
-    port = serial.Serial(serialPort)
+    port = serial.Serial(serialPort)  # open serial port
     print("Connected to " + port.name)
     running = True
     while running:
         selection = input('Scan, Load from file, or Quit? (s/l/q): ').lower()
-        if selection == 's':
-            rawData = getData()
-            fileNum = writeToFile(rawData)
-            scaledData = convertToDist(rawData)
-            x, y, map_value = convertToNPArray(scaledData)
-            plot = draw_heatmap(x, y, map_value)
-            plot.savefig(filePath + '/' + 'Scan' + fileNum + '.png')
-        elif selection == 'l':
+        if selection == 's':  # scan an object, save the file, plot it, and save the plot
+            rawData = getData()  # scan the object
+            fileNum = writeToFile(rawData)  # save the data
+            scaledData = convertToDist(rawData)  # scale the data
+            x, y, map_value = convertToNPArray(scaledData)  # convert the data so it can be plotted
+            plot = draw_heatmap(x, y, map_value)  # make the plot
+            plot.savefig(filePath + '/' + 'Scan' + fileNum + '.png')  # save the plot
+        elif selection == 'l':  # read a text file and plot the data
             dataPath = input('Enter the path of the desired data file: ')
-            dataFile = open(dataPath)
+            dataFile = open(dataPath)  # open the path specified
             textData = dataFile.readlines()
             rawData = []
-            for element in textData:
+            for element in textData:  # read each line as a list and add it to another list
                 line = eval(element)
                 rawData.append(line)
+            dataFile.close()
             scaledData = convertToDist(rawData)
-            for line in scaledData:
-                print(line)
+            # for line in scaledData:
+            #     print(line)
             x, y, map_value = convertToNPArray(scaledData)
             plot = draw_heatmap(x, y, map_value)
         else:
